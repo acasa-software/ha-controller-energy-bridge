@@ -1,0 +1,51 @@
+name: Bug report
+description: Something in the Controller Energy Bridge integration does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Questions about the Controller for HomeKit app itself belong to the app support (https://acasa-software.de).
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant version
+      placeholder: "2026.9.1"
+    validations:
+      required: true
+  - type: input
+    id: integration-version
+    attributes:
+      label: Integration version
+      description: As shown in HACS or in `manifest.json`.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: What did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Configure the Energy dashboard with ...
+        2. Add the integration ...
+        3. Pair in Controller for HomeKit ...
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Settings > Devices & services > Controller Energy Bridge > Download diagnostics. Attach the file (drag it into this field). It contains no pairing secrets.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log excerpt
+      description: Relevant lines from Settings > System > Logs, ideally with `custom_components.controller_energy_bridge` set to debug.
+      render: text

@@ -1,0 +1,3 @@
+pytest-homeassistant-custom-component==0.13.365
+HAP-python==5.0.0
+base36==0.1.1

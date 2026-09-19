@@ -1,0 +1,88 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Import Energy dashboard",
+        "description": "The following {count} energy nodes were found in your Energy dashboard:\n\n{nodes}\n\nConfirm to continue. In the next steps you choose a power sensor for each node.",
+        "data": {
+          "confirm": "Import these nodes",
+          "port": "HomeKit port",
+          "update_interval": "Update interval"
+        },
+        "data_description": {
+          "port": "TCP port of the bridge's own HomeKit server. Must differ from the HomeKit Bridge integration.",
+          "update_interval": "Minimum seconds between HomeKit notifications per value (1-300)."
+        }
+      },
+      "node": {
+        "title": "Power source for {node_name}",
+        "description": "Node {position} of {count}: **{node_name}** ({role}), energy meter `{energy_entity}`.\n\nChoose the sensor that reports live power in W or kW. Positive means: Grid = importing, Battery = discharging, Solar/Device = producing/consuming. Enable \"Inverted\" if your sensor uses the opposite sign.",
+        "data": {
+          "name": "Name",
+          "power_entity": "Power sensor",
+          "inverted": "Inverted sign",
+          "soc_entity": "State of charge sensor",
+          "capacity": "Battery capacity"
+        },
+        "data_description": {
+          "capacity": "Usable capacity in kWh (optional)."
+        }
+      },
+      "home": {
+        "title": "Home consumption (optional)",
+        "description": "If Home Assistant has a real sensor for total home consumption, select it here. Leave both fields empty and Controller for HomeKit derives home consumption from grid, solar and battery.",
+        "data": {
+          "home_power_entity": "Home power sensor",
+          "home_energy_entity": "Home energy meter",
+          "inverted": "Inverted sign"
+        }
+      }
+    },
+    "error": {
+      "confirm_required": "Please confirm the import to continue."
+    },
+    "abort": {
+      "no_energy_dashboard": "The Energy dashboard is not configured. Set it up under Settings > Dashboards > Energy first.",
+      "single_instance_allowed": "Only a single Controller Energy Bridge is allowed."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Re-import Energy dashboard",
+        "description": "The following {count} energy nodes were found in your Energy dashboard:\n\n{nodes}\n\nConfirm to review the power sources again. HomeKit is notified about layout changes.",
+        "data": {
+          "confirm": "Re-import these nodes",
+          "port": "HomeKit port",
+          "update_interval": "Update interval"
+        }
+      },
+      "node": {
+        "title": "Power source for {node_name}",
+        "description": "Node {position} of {count}: **{node_name}** ({role}), energy meter `{energy_entity}`.",
+        "data": {
+          "name": "Name",
+          "power_entity": "Power sensor",
+          "inverted": "Inverted sign",
+          "soc_entity": "State of charge sensor",
+          "capacity": "Battery capacity"
+        }
+      },
+      "home": {
+        "title": "Home consumption (optional)",
+        "description": "Leave both fields empty to remove the Home node.",
+        "data": {
+          "home_power_entity": "Home power sensor",
+          "home_energy_entity": "Home energy meter",
+          "inverted": "Inverted sign"
+        }
+      }
+    },
+    "error": {
+      "confirm_required": "Please confirm the import to continue."
+    },
+    "abort": {
+      "no_energy_dashboard": "The Energy dashboard is not configured."
+    }
+  }
+}

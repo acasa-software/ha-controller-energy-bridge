@@ -1,0 +1,88 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Energie-Dashboard importieren",
+        "description": "Im Energie-Dashboard wurden {count} Energieknoten gefunden:\n\n{nodes}\n\nBestätige, um fortzufahren. In den nächsten Schritten wählst du pro Knoten einen Leistungssensor.",
+        "data": {
+          "confirm": "Diese Knoten importieren",
+          "port": "HomeKit-Port",
+          "update_interval": "Aktualisierungsintervall"
+        },
+        "data_description": {
+          "port": "TCP-Port des eigenen HomeKit-Servers der Bridge. Muss sich vom Port der HomeKit-Bridge-Integration unterscheiden.",
+          "update_interval": "Mindestabstand in Sekunden zwischen HomeKit-Benachrichtigungen pro Wert (1-300)."
+        }
+      },
+      "node": {
+        "title": "Leistungsquelle für {node_name}",
+        "description": "Knoten {position} von {count}: **{node_name}** ({role}), Energiezähler `{energy_entity}`.\n\nWähle den Sensor, der die aktuelle Leistung in W oder kW liefert. Positiv bedeutet: Netz = Bezug, Batterie = Entladen, Solar/Gerät = Erzeugung/Verbrauch. Aktiviere „Invertiert“, wenn dein Sensor das umgekehrte Vorzeichen verwendet.",
+        "data": {
+          "name": "Name",
+          "power_entity": "Leistungssensor",
+          "inverted": "Vorzeichen invertiert",
+          "soc_entity": "Ladezustand-Sensor",
+          "capacity": "Batteriekapazität"
+        },
+        "data_description": {
+          "capacity": "Nutzbare Kapazität in kWh (optional)."
+        }
+      },
+      "home": {
+        "title": "Hausverbrauch (optional)",
+        "description": "Wenn Home Assistant einen echten Sensor für den gesamten Hausverbrauch hat, wähle ihn hier. Lass beide Felder leer, dann berechnet Controller for HomeKit den Hausverbrauch aus Netz, Solar und Batterie.",
+        "data": {
+          "home_power_entity": "Leistungssensor Haus",
+          "home_energy_entity": "Energiezähler Haus",
+          "inverted": "Vorzeichen invertiert"
+        }
+      }
+    },
+    "error": {
+      "confirm_required": "Bitte bestätige den Import, um fortzufahren."
+    },
+    "abort": {
+      "no_energy_dashboard": "Das Energie-Dashboard ist nicht konfiguriert. Richte es zuerst unter Einstellungen > Dashboards > Energie ein.",
+      "single_instance_allowed": "Es ist nur eine Controller Energy Bridge erlaubt."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Energie-Dashboard erneut importieren",
+        "description": "Im Energie-Dashboard wurden {count} Energieknoten gefunden:\n\n{nodes}\n\nBestätige, um die Leistungsquellen erneut zu prüfen. HomeKit wird über Layout-Änderungen informiert.",
+        "data": {
+          "confirm": "Diese Knoten erneut importieren",
+          "port": "HomeKit-Port",
+          "update_interval": "Aktualisierungsintervall"
+        }
+      },
+      "node": {
+        "title": "Leistungsquelle für {node_name}",
+        "description": "Knoten {position} von {count}: **{node_name}** ({role}), Energiezähler `{energy_entity}`.",
+        "data": {
+          "name": "Name",
+          "power_entity": "Leistungssensor",
+          "inverted": "Vorzeichen invertiert",
+          "soc_entity": "Ladezustand-Sensor",
+          "capacity": "Batteriekapazität"
+        }
+      },
+      "home": {
+        "title": "Hausverbrauch (optional)",
+        "description": "Lass beide Felder leer, um den Haus-Knoten zu entfernen.",
+        "data": {
+          "home_power_entity": "Leistungssensor Haus",
+          "home_energy_entity": "Energiezähler Haus",
+          "inverted": "Vorzeichen invertiert"
+        }
+      }
+    },
+    "error": {
+      "confirm_required": "Bitte bestätige den Import, um fortzufahren."
+    },
+    "abort": {
+      "no_energy_dashboard": "Das Energie-Dashboard ist nicht konfiguriert."
+    }
+  }
+}
