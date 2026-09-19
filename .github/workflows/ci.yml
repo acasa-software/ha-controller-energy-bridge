@@ -16,22 +16,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-        with:
-          python-version: "3.14"
+      # The runner ships no Python 3.14; uv downloads a managed interpreter into the venv.
+      - name: Create virtualenv
+        run: uv venv --python 3.14 .venv
       - name: Install test dependencies (pinned)
         if: matrix.harness == 'pinned'
-        run: uv pip install --system -r requirements_test.txt
+        run: uv pip install -r requirements_test.txt
       - name: Install test dependencies (latest harness, early warning)
         if: matrix.harness == 'latest'
         run: |
-          uv pip install --system -r requirements_test.txt
-          uv pip install --system --upgrade pytest-homeassistant-custom-component
-          python -c "import importlib.metadata as m; print('pytest-homeassistant-custom-component', m.version('pytest-homeassistant-custom-component'))"
+          uv pip install -r requirements_test.txt
+          uv pip install --upgrade pytest-homeassistant-custom-component
+          .venv/bin/python -c "import importlib.metadata as m; print('pytest-homeassistant-custom-component', m.version('pytest-homeassistant-custom-component'))"
       - name: pytest
-        run: pytest -q
+        run: .venv/bin/pytest -q
       - name: ruff check
         if: matrix.harness == 'pinned'
-        run: ruff check custom_components tests
+        run: .venv/bin/ruff check custom_components tests
       - name: ruff format --check
         if: matrix.harness == 'pinned'
-        run: ruff format --check custom_components tests
+        run: .venv/bin/ruff format --check custom_components tests
