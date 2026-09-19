@@ -4,5 +4,5 @@ contact_links:
     url: https://acasa-software.de
     about: Questions about the Controller for HomeKit app itself belong to the app support, not to this repository.
   - name: Security vulnerability
-    url: https://github.com/acasa-software/controller-energy-bridge/blob/main/SECURITY.md
+    url: https://github.com/acasa-software/ha-controller-energy-bridge/blob/main/SECURITY.md
     about: Please do not open a public issue for security problems. See SECURITY.md.

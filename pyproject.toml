@@ -1,5 +1,5 @@
 [project]
-name = "controller-energy-bridge"
+name = "ha-controller-energy-bridge"
 version = "1.0.0"
 description = "Home Assistant custom integration exposing the Energy dashboard as a HomeKit accessory for Controller for HomeKit"
 requires-python = ">=3.14"

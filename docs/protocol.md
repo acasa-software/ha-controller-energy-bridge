@@ -4,7 +4,7 @@
 
 This document is the contract between the Home Assistant integration ("the bridge") and Controller for HomeKit ("the app"). The bridge exposes the Home Assistant Energy dashboard as a single HomeKit accessory with Controller-specific services and characteristics. The app renders an energy-flow view from it. Both sides are implemented and tested against this document; neither side relies on behaviour that is not written here.
 
-This document in the `controller-energy-bridge` repository is the authoritative version. Controller for HomeKit keeps a copy of it in the app repository.
+This document in the `ha-controller-energy-bridge` repository is the authoritative version. Controller for HomeKit keeps a copy of it in the app repository.
 
 ## 1. Scope
 

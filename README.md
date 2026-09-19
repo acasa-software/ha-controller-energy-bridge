@@ -1,7 +1,7 @@
 # Controller Energy Bridge
 
-[![CI](https://github.com/acasa-software/controller-energy-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/acasa-software/controller-energy-bridge/actions/workflows/ci.yml)
-[![Validate](https://github.com/acasa-software/controller-energy-bridge/actions/workflows/validate.yml/badge.svg)](https://github.com/acasa-software/controller-energy-bridge/actions/workflows/validate.yml)
+[![CI](https://github.com/acasa-software/ha-controller-energy-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/acasa-software/ha-controller-energy-bridge/actions/workflows/ci.yml)
+[![Validate](https://github.com/acasa-software/ha-controller-energy-bridge/actions/workflows/validate.yml/badge.svg)](https://github.com/acasa-software/ha-controller-energy-bridge/actions/workflows/validate.yml)
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -180,7 +180,7 @@ downloads contain node configuration and last values but no pairing secrets.
 ## Versioning
 
 Releases follow [Semantic Versioning](https://semver.org) and are published as
-[GitHub Releases](https://github.com/acasa-software/controller-energy-bridge/releases) from
+[GitHub Releases](https://github.com/acasa-software/ha-controller-energy-bridge/releases) from
 `vX.Y.Z` tags; `CHANGELOG.md` lists the changes. Beta builds are tagged `vX.Y.Z-beta.N` and
 published as pre-releases; enable **Show beta versions** for this repository in HACS to receive
 them.

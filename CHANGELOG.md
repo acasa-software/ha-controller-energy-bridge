@@ -31,5 +31,5 @@ Requires Controller for HomeKit 10.1 or newer (protocol schema 1).
 - Pairing notification with PIN and setup URI, diagnostics download, English and German
   translations.
 
-[Unreleased]: https://github.com/acasa-software/controller-energy-bridge/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/acasa-software/controller-energy-bridge/releases/tag/v1.0.0
+[Unreleased]: https://github.com/acasa-software/ha-controller-energy-bridge/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/acasa-software/ha-controller-energy-bridge/releases/tag/v1.0.0
