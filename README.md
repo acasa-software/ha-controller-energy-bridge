@@ -5,7 +5,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-<!-- TODO: brand/icon.png is a placeholder. Replace it with the final icon and open a pull request in home-assistant/brands (see CONTRIBUTING.md). -->
+<!-- TODO: open the pull request in home-assistant/brands with brand/icon.png and brand/icon@2x.png (see CONTRIBUTING.md), then drop `ignore: brands` from .github/workflows/validate.yml. -->
 
 Home Assistant custom integration that exposes the **Energy dashboard** as a single HomeKit
 accessory for **Controller for HomeKit** (Acasa Software). The app renders an energy-flow view
