@@ -229,10 +229,16 @@ class EnergyBridge:
             except Exception:  # noqa: BLE001 - shutdown must not raise into HA
                 _LOGGER.exception("Error while stopping the HAP driver")
 
-    def config_changed(self) -> None:
-        """Bump the HAP configuration number (§4, §9)."""
-        if self.driver is not None:
-            self.driver.config_changed()
+    def bump_config_version(self) -> None:
+        """Bump the HAP configuration number (§4, §9) before the server starts.
+
+        Never via pyhap's `config_changed` on a running driver: its deferred advertisement
+        update can re-add the mDNS name after a reload unregistered it (orphan record,
+        ServiceNameAlreadyRegistered on every later start until HA restarts).
+        """
+        assert self.driver is not None and not self._started
+        self.driver.state.increment_config_version()
+        self.driver.persist()
 
     # --- pairing info -------------------------------------------------------
 

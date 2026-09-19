@@ -176,6 +176,56 @@ async def test_unchanged_signature_does_not_bump_config(
     assert entry.runtime_data.driver.state.config_version == 1
 
 
+async def test_config_version_bumps_before_server_start(
+    energy_ready: None, hass: HomeAssistant, hap_offline: dict[str, Any]
+) -> None:
+    """The new c# must be in the first advertisement; a post-start update task would
+    re-add the mDNS name after a reload's unregister (ServiceNameAlreadyRegistered)."""
+    entry = _entry()
+    entry.add_to_hass(hass)
+    seen: list[int] = []
+    hap_offline["start"].side_effect = lambda: seen.append(
+        entry.runtime_data.driver.state.config_version
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert seen == [2]
+    entry.runtime_data.driver.update_advertisement.assert_not_called()
+
+
+async def test_legacy_entry_without_newer_node_keys_does_not_reload(
+    energy_ready: None, hass: HomeAssistant, hap_offline: dict[str, Any]
+) -> None:
+    """Entries written before the history fields existed must not trigger a reload
+    from the signature-only write on start."""
+    legacy_keys = {
+        "energy_from_statistic",
+        "energy_to_statistic",
+        "name_is_default",
+        "unreadable_statistics",
+    }
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_PORT: 21066,
+            CONF_UPDATE_INTERVAL: 5,
+            CONF_NODES: [
+                {k: v for k, v in node.to_dict().items() if k not in legacy_keys} for node in NODES
+            ],
+        },
+    )
+    entry.add_to_hass(hass)
+    with patch.object(
+        hass.config_entries, "async_reload", wraps=hass.config_entries.async_reload
+    ) as reload:
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    reload.assert_not_called()
+    assert entry.state is ConfigEntryState.LOADED
+    hap_offline["start"].assert_awaited_once()
+    assert CONF_PUBLISHED_SIGNATURE in entry.data
+
+
 async def test_state_change_updates_accessory(
     energy_ready: None, hass: HomeAssistant, hap_offline: dict[str, Any]
 ) -> None:

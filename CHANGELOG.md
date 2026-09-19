@@ -9,6 +9,16 @@ plain version number of the release the beta leads up to.
 
 ## [Unreleased]
 
+### Fixed
+
+- Upgrading from an entry written by an earlier version no longer reloads the integration on
+  start: the update listener compares parsed nodes instead of raw dicts, so the signature-only
+  write does not count as a change.
+- The HAP configuration number is bumped before the server starts instead of through a
+  post-start advertisement update. That update could re-register the mDNS name after a
+  reload had removed it, leaving every later start failing with
+  `ServiceNameAlreadyRegistered` until Home Assistant restarted.
+
 ## [1.0.0] - 2026-09-19
 
 Requires Controller for HomeKit 10.1 or newer (protocol schema 1).

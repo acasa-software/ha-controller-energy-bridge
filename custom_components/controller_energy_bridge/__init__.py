@@ -85,13 +85,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnergyBridgeConfigEntry)
     entry.runtime_data = bridge
 
     async def _start(_hass: HomeAssistant) -> None:
-        await bridge.async_start()
         signature = nodes_signature(nodes)
         if entry.data.get(CONF_PUBLISHED_SIGNATURE) != signature:
-            bridge.config_changed()
+            bridge.bump_config_version()
             hass.config_entries.async_update_entry(
                 entry, data={**entry.data, CONF_PUBLISHED_SIGNATURE: signature}
             )
+        await bridge.async_start()
         _update_pairing_notification(hass, bridge)
         if bridge.paired:
             return
@@ -123,8 +123,9 @@ async def _async_entry_updated(hass: HomeAssistant, entry: EnergyBridgeConfigEnt
     bridge: EnergyBridge | None = getattr(entry, "runtime_data", None)
     if bridge is None:
         return
+    # Compare parsed nodes, not raw dicts: entries written by older versions lack newer keys.
     unchanged = (
-        [node.to_dict() for node in bridge.nodes] == list(entry.data.get(CONF_NODES, []))
+        _nodes_from_entry(entry) == bridge.nodes
         and bridge.port == int(entry.data.get(CONF_PORT, DEFAULT_PORT))
         and bridge.update_interval
         == int(entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL))
