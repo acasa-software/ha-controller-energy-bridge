@@ -9,6 +9,12 @@ plain version number of the release the beta leads up to.
 
 ## [Unreleased]
 
+### Added
+
+- Today's energy per node (protocol §14): `Energy From Today` and `Energy To Today` in kWh,
+  live, pinned to Home Assistant's statistics at start, hourly and at 00:01. Paired
+  controllers refresh automatically (new HAP configuration number).
+
 ### Fixed
 
 - Upgrading from an entry written by an earlier version no longer reloads the integration on

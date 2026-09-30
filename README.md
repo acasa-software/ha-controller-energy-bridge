@@ -98,6 +98,14 @@ published so the app can render them dimmed.
 Statistic ids that are not entity ids (external statistics like `pvoutput:daily_yield`) cannot
 be read live: the node is exposed without energy characteristics and with `Status Fault` `1`.
 
+## Today
+
+Nodes with energy statistics also publish `Energy From Today` and `Energy To Today` (protocol
+§14): the energy since local midnight in kWh, the same figure the Energy dashboard shows. The
+value is pinned to the recorder at start, at :15 every hour and at 00:01, and in between
+follows the live meter, so it is as current as the sensor without a database query per
+update. Controller for HomeKit shows it under "Today" on the energy screen and tile.
+
 ## History
 
 Each node carries up to two read-only `data` characteristics with pre-aggregated history
@@ -152,9 +160,10 @@ to the matching release in `requirements_test.txt`.
 |---|---|
 | `tests/test_energy_import.py` | Dashboard preferences to nodes: new and legacy grid format, `power_config` variants, external statistics, gas/water, ordering, dict round-trip, merge of user settings across re-imports |
 | `tests/test_accessory.py` | HAP structure exactly per protocol: UUIDs, formats, permissions, ranges, required/optional characteristics per role, IID ordering, sign conventions, thresholds, clamping, fault behaviour, 64 nodes, history characteristics (`data`, `pr`, presence per source, base64 value) |
+| `tests/test_today.py` | Today's energy per §14: statistics baseline against the live meter, meter reset within the day and between compile and now, midnight restart, meters without a live state |
 | `tests/test_history.py` | History blobs per protocol §13: exact byte layout, bucket alignment, hourly `change` series with gaps and unit conversion, 15-minute power means with inversion and clamping |
 | `tests/test_units.py` | Unit normalisation and numeric parsing |
-| `tests/test_bridge.py` | State decoding, unit handling in the state path, fault rules, per-node throttling with timers, history rebuilds against a mocked recorder (query parameters, external statistic ids, failure keeps the previous blob) |
+| `tests/test_bridge.py` | State decoding, unit handling in the state path, fault rules, per-node throttling with timers, history rebuilds against a mocked recorder (query parameters, external statistic ids, failure keeps the previous blob), today's energy pinned from mocked statistics and followed live |
 | `tests/test_config_flow.py` | Config flow happy path, Home node placement, confirmation error, power-sensor suggestion from the device registry, single instance, options flow with carried-over settings, abort without Energy dashboard |
 | `tests/test_init.py` | Entry setup with a stubbed pyhap network layer: seeding from current states, configuration-number bump on layout change, pairing notification, diagnostics, state-change forwarding, Energy dashboard follow-up and reload, listener no-op after unload, deferred start until Home Assistant is running, scheduled history rebuilds and their cancellation on unload |
 

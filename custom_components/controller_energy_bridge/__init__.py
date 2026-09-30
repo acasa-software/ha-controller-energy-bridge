@@ -40,8 +40,9 @@ _PAIRING_POLL = timedelta(seconds=30)
 
 
 # Bumped whenever the bridge changes which characteristics a given node layout produces,
-# so upgraded installs advertise a new HAP configuration number (§4). 2: history (§13).
-_LAYOUT_REVISION = 2
+# so upgraded installs advertise a new HAP configuration number (§4).
+# 2: history (§13), 3: today (§14).
+_LAYOUT_REVISION = 3
 
 
 def nodes_signature(nodes: list[NodeConfig]) -> str:

@@ -16,8 +16,10 @@ from custom_components.controller_energy_bridge.accessory import (
 from custom_components.controller_energy_bridge.const import (
     CHAR_CAPACITY,
     CHAR_ENERGY_FROM,
+    CHAR_ENERGY_FROM_TODAY,
     CHAR_ENERGY_HISTORY,
     CHAR_ENERGY_TO,
+    CHAR_ENERGY_TO_TODAY,
     CHAR_NAME,
     CHAR_NODE_INDEX,
     CHAR_NODE_ROLE,
@@ -116,6 +118,8 @@ def test_uuid_layout() -> None:
     assert _u(CHAR_SOURCE_ENTITY) == "00000118" + SUFFIX
     assert _u(CHAR_ENERGY_HISTORY) == "00000119" + SUFFIX
     assert _u(CHAR_POWER_HISTORY) == "0000011A" + SUFFIX
+    assert _u(CHAR_ENERGY_FROM_TODAY) == "0000011B" + SUFFIX
+    assert _u(CHAR_ENERGY_TO_TODAY) == "0000011C" + SUFFIX
     assert _u(CHAR_NAME) == "00000023-0000-1000-8000-0026BB765291"
     assert _u(CHAR_STATUS_FAULT) == "00000077-0000-1000-8000-0026BB765291"
 
@@ -187,6 +191,8 @@ def test_grid_node_characteristics(hap_driver: AccessoryDriver) -> None:
         _u(CHAR_SOURCE_ENTITY),
         _u(CHAR_ENERGY_HISTORY),
         _u(CHAR_POWER_HISTORY),
+        _u(CHAR_ENERGY_FROM_TODAY),
+        _u(CHAR_ENERGY_TO_TODAY),
     }
     assert chars[_u(CHAR_NAME)]["value"] == "Netz"
     assert chars[_u(CHAR_NAME)]["perms"] == ["pr"]
@@ -198,7 +204,7 @@ def test_grid_node_characteristics(hap_driver: AccessoryDriver) -> None:
     assert power["format"] == "float"
     assert sorted(power["perms"]) == ["ev", "pr"]
     assert (power["minValue"], power["maxValue"], power["minStep"]) == (-1_000_000, 1_000_000, 1)
-    for key in (CHAR_ENERGY_FROM, CHAR_ENERGY_TO):
+    for key in (CHAR_ENERGY_FROM, CHAR_ENERGY_TO, CHAR_ENERGY_FROM_TODAY, CHAR_ENERGY_TO_TODAY):
         energy = chars[_u(key)]
         assert energy["format"] == "float"
         assert sorted(energy["perms"]) == ["ev", "pr"]
@@ -325,6 +331,14 @@ def _values(accessory: EnergyBridgeAccessory, index: int) -> dict[str, Any]:
     }
 
 
+def _today(accessory: EnergyBridgeAccessory, index: int) -> tuple[Any, Any]:
+    node = accessory.nodes[index]
+    return (
+        node.energy_from_today.get_value() if node.energy_from_today else None,
+        node.energy_to_today.get_value() if node.energy_to_today else None,
+    )
+
+
 def test_update_node_reference_example(hap_driver: AccessoryDriver) -> None:
     accessory = _build(hap_driver, [GRID, SOLAR, BATTERY, DEVICE])
     accessory.update_node(0, power=-1500, energy_from=500.0, energy_to=1200.00, fault=False)
@@ -362,6 +376,27 @@ def test_energy_threshold(hap_driver: AccessoryDriver) -> None:
     accessory.update_node(0, energy_from=100.001, energy_to=5.002)
     assert _values(accessory, 0)["energy_from"] == pytest.approx(100.001)
     assert _values(accessory, 0)["energy_to"] == pytest.approx(5.002)
+
+
+def test_today_follows_energy_threshold(hap_driver: AccessoryDriver) -> None:
+    accessory = _build(hap_driver, [GRID])
+    accessory.update_node(0, energy_from_today=3.0, energy_to_today=1.0)
+    accessory.update_node(0, energy_from_today=3.0004, energy_to_today=1.0009)
+    assert _today(accessory, 0) == pytest.approx((3.0, 1.0))
+    accessory.update_node(0, energy_from_today=3.002)
+    assert _today(accessory, 0) == pytest.approx((3.002, 1.0))
+
+
+def test_today_presence_follows_energy_statistics(hap_driver: AccessoryDriver) -> None:
+    solar = NodeConfig(NodeRole.SOLAR, 0, "PV", "sensor.pv_e", None, "sensor.pv_p")
+    no_energy = NodeConfig(NodeRole.DEVICE, 1, "Plug", None, None, "sensor.plug_p")
+    accessory = _build(hap_driver, [solar, no_energy])
+    services = _services(_hap(accessory), SERVICE_ENERGY_NODE)
+    solar_chars = _chars(services[0])
+    assert _u(CHAR_ENERGY_FROM_TODAY) in solar_chars
+    assert _u(CHAR_ENERGY_TO_TODAY) not in solar_chars
+    plug_chars = _chars(services[1])
+    assert _u(CHAR_ENERGY_FROM_TODAY) not in plug_chars
 
 
 def test_energy_may_decrease_on_meter_reset(hap_driver: AccessoryDriver) -> None:

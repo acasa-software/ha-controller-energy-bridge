@@ -21,8 +21,10 @@ from .const import (
     CAPACITY_STEP,
     CHAR_CAPACITY,
     CHAR_ENERGY_FROM,
+    CHAR_ENERGY_FROM_TODAY,
     CHAR_ENERGY_HISTORY,
     CHAR_ENERGY_TO,
+    CHAR_ENERGY_TO_TODAY,
     CHAR_NODE_INDEX,
     CHAR_NODE_ROLE,
     CHAR_POWER,
@@ -121,11 +123,16 @@ class NodeChars:
     # History blobs (§13), None where the node lacks the sources.
     energy_history: Characteristic | None = None
     power_history: Characteristic | None = None
+    # Today's energy (§14), None where the node has no energy statistics.
+    energy_from_today: Characteristic | None = None
+    energy_to_today: Characteristic | None = None
     # Last values pushed to HAP, used for the publish thresholds (§9).
     last_power: float | None = None
     last_energy_from: float | None = None
     last_energy_to: float | None = None
     last_soc: float | None = None
+    last_energy_from_today: float | None = None
+    last_energy_to_today: float | None = None
 
 
 class EnergyBridgeAccessory(Accessory):
@@ -264,6 +271,30 @@ class EnergyBridgeAccessory(Accessory):
             power_history = _char("Power History", CHAR_POWER_HISTORY, "data", (PERM_READ,))
             chars.append(power_history)
 
+        energy_from_today: Characteristic | None = None
+        if config.history_energy_from:
+            energy_from_today = _float_char(
+                "Energy From Today",
+                CHAR_ENERGY_FROM_TODAY,
+                ENERGY_MIN,
+                ENERGY_MAX,
+                ENERGY_STEP,
+                event=True,
+            )
+            chars.append(energy_from_today)
+
+        energy_to_today: Characteristic | None = None
+        if config.history_energy_to:
+            energy_to_today = _float_char(
+                "Energy To Today",
+                CHAR_ENERGY_TO_TODAY,
+                ENERGY_MIN,
+                ENERGY_MAX,
+                ENERGY_STEP,
+                event=True,
+            )
+            chars.append(energy_to_today)
+
         service.add_characteristic(*chars)
 
         name.set_value(config.name[:NAME_MAX_LEN], should_notify=False)
@@ -288,6 +319,8 @@ class EnergyBridgeAccessory(Accessory):
             status_fault=status_fault,
             energy_history=energy_history,
             power_history=power_history,
+            energy_from_today=energy_from_today,
+            energy_to_today=energy_to_today,
         )
         return service
 
@@ -302,6 +335,8 @@ class EnergyBridgeAccessory(Accessory):
         energy_to: float | None = None,
         soc: float | None = None,
         fault: bool | None = None,
+        energy_from_today: float | None = None,
+        energy_to_today: float | None = None,
     ) -> None:
         """Push new values for a node, honouring sign rules (§7) and thresholds (§9).
 
@@ -343,6 +378,24 @@ class EnergyBridgeAccessory(Accessory):
             if node.last_soc is None or abs(value - node.last_soc) >= THRESHOLD_SOC_PERCENT:
                 node.soc.set_value(value)
                 node.last_soc = value
+
+        if energy_from_today is not None and node.energy_from_today is not None:
+            value = clamp(energy_from_today, ENERGY_MIN, ENERGY_MAX)
+            if (
+                node.last_energy_from_today is None
+                or abs(value - node.last_energy_from_today) >= THRESHOLD_ENERGY_KWH
+            ):
+                node.energy_from_today.set_value(value)
+                node.last_energy_from_today = value
+
+        if energy_to_today is not None and node.energy_to_today is not None:
+            value = clamp(energy_to_today, ENERGY_MIN, ENERGY_MAX)
+            if (
+                node.last_energy_to_today is None
+                or abs(value - node.last_energy_to_today) >= THRESHOLD_ENERGY_KWH
+            ):
+                node.energy_to_today.set_value(value)
+                node.last_energy_to_today = value
 
         if fault is not None:
             # pyhap only notifies on change, which matches "publish on every transition".
