@@ -260,3 +260,163 @@ async def test_history_rebuild_failure_keeps_previous_blob(hass: HomeAssistant) 
         await bridge.async_rebuild_energy_history()
     bridge.accessory.set_history.assert_not_called()
     assert bridge.energy_history == {}
+
+
+# --- today (§14) -------------------------------------------------------------
+
+
+def _today_recorder(
+    changes: dict[str, float], references: dict[str, float], period_start: float
+) -> tuple[Any, Any, Any, list[Any]]:
+    ends: list[Any] = []
+
+    def during_period(_hass, _start, end, statistic_id, types, units) -> dict[str, float]:  # noqa: ANN001
+        assert types == {"change"}
+        assert units == {"energy": "kWh"}
+        ends.append(end)
+        return {"change": changes[statistic_id]}
+
+    def recent(_hass, _start, _end, ids, period, units, types) -> dict[str, list]:  # noqa: ANN001
+        assert (period, types) == ("5minute", {"state"})
+        (sid,) = ids
+        return {sid: [{"start": period_start, "state": references[sid]}]}
+
+    return (
+        patch(f"{BRIDGE_MODULE}.get_instance", return_value=_Recorder()),
+        patch(f"{BRIDGE_MODULE}.statistic_during_period", side_effect=during_period),
+        patch(f"{BRIDGE_MODULE}.statistics_during_period", side_effect=recent),
+        ends,
+    )
+
+
+async def test_today_rebuild_pins_statistics_and_follows_live_meters(hass: HomeAssistant) -> None:
+    hass.config.components.add("recorder")
+    hass.states.async_set("sensor.imp", "104.2", {"unit_of_measurement": "kWh"})
+    hass.states.async_set("sensor.exp", "7.0", {"unit_of_measurement": "kWh"})
+    bridge = _bridge(hass, [GRID])
+    period_start = dt_util.utcnow().timestamp() - 600
+    instance, during, recent, ends = _today_recorder(
+        {"sensor.imp": 4.0, "sensor.exp": 1.5},
+        {"sensor.imp": 104.0, "sensor.exp": 7.0},
+        period_start,
+    )
+    with instance, during, recent:
+        await bridge.async_rebuild_today()
+
+    # The daily change is cut at the very end of the period whose reading is the reference.
+    assert ends == [dt_util.utc_from_timestamp(period_start + 300)] * 2
+    pushed = {k: v for call in _calls(bridge) for k, v in call.items() if k.endswith("_today")}
+    assert pushed["energy_from_today"] == pytest.approx(4.2)
+    assert pushed["energy_to_today"] == pytest.approx(1.5)
+
+    hass.states.async_set("sensor.imp", "105.0", {"unit_of_measurement": "kWh"})
+    bridge.accessory.update_node.reset_mock()
+    bridge._collect_node(0)
+    bridge._flush(0)
+    (call,) = _calls(bridge)
+    assert call["energy_from_today"] == pytest.approx(5.0)
+
+
+async def test_today_resumes_when_the_live_meter_returns(hass: HomeAssistant) -> None:
+    hass.config.components.add("recorder")
+    hass.states.async_set("sensor.imp", "unavailable")
+    bridge = _bridge(hass, [GRID])
+    instance, during, recent, _ = _today_recorder(
+        {"sensor.imp": 4.0, "sensor.exp": 0.0},
+        {"sensor.imp": 104.0, "sensor.exp": 0.0},
+        dt_util.utcnow().timestamp() - 600,
+    )
+    with instance, during, recent:
+        await bridge.async_rebuild_today()
+    hass.states.async_set("sensor.imp", "104.5", {"unit_of_measurement": "kWh"})
+    bridge.accessory.update_node.reset_mock()
+    bridge._collect_node(0)
+    bridge._flush(0)
+    (call,) = _calls(bridge)
+    assert call["energy_from_today"] == pytest.approx(4.5)
+
+
+async def test_period_ending_before_midnight_retries_instead_of_guessing(
+    hass: HomeAssistant,
+) -> None:
+    hass.config.components.add("recorder")
+    hass.states.async_set("sensor.imp", "120.3", {"unit_of_measurement": "kWh"})
+    bridge = _bridge(hass, [GRID])
+    midnight = dt_util.start_of_local_day().timestamp()
+    instance, during, recent, ends = _today_recorder(
+        {"sensor.imp": 0.0, "sensor.exp": 0.0},
+        {"sensor.imp": 119.0, "sensor.exp": 5.0},
+        midnight - 900,
+    )
+    with instance, during, recent:
+        await bridge.async_rebuild_today()
+    assert ends == []
+    assert not bridge.accessory.update_node.called
+    assert bridge._today_retry is not None
+    await bridge.async_stop()
+    assert bridge._today_retry is None
+
+
+async def test_period_ending_at_midnight_starts_today_at_its_reading(hass: HomeAssistant) -> None:
+    hass.config.components.add("recorder")
+    hass.states.async_set("sensor.imp", "120.3", {"unit_of_measurement": "kWh"})
+    bridge = _bridge(hass, [GRID])
+    midnight = dt_util.start_of_local_day().timestamp()
+    instance, during, recent, ends = _today_recorder(
+        {"sensor.imp": 99.0, "sensor.exp": 99.0},
+        {"sensor.imp": 120.0, "sensor.exp": 5.0},
+        midnight - 300,
+    )
+    with instance, during, recent:
+        await bridge.async_rebuild_today()
+    assert ends == []  # no change query: nothing of today is compiled yet
+    pushed = {k: v for call in _calls(bridge) for k, v in call.items() if k.endswith("_today")}
+    assert pushed["energy_from_today"] == pytest.approx(0.3)
+
+
+async def test_rebase_replaces_a_pending_value_from_the_old_baseline(hass: HomeAssistant) -> None:
+    hass.config.components.add("recorder")
+    hass.states.async_set("sensor.imp", "104.0", {"unit_of_measurement": "kWh"})
+    bridge = _bridge(hass, [GRID])
+    bridge._runtime[0].pending["energy_from_today"] = 55.0  # yesterday's total, not yet flushed
+    instance, during, recent, _ = _today_recorder(
+        {"sensor.imp": 4.0, "sensor.exp": 0.0},
+        {"sensor.imp": 104.0, "sensor.exp": 0.0},
+        dt_util.utcnow().timestamp() - 600,
+    )
+    with instance, during, recent:
+        await bridge.async_rebuild_today()
+    assert bridge._runtime[0].pending["energy_from_today"] == pytest.approx(4.0)
+
+
+async def test_live_sensor_without_recent_statistics_keeps_its_baseline(
+    hass: HomeAssistant,
+) -> None:
+    hass.config.components.add("recorder")
+    hass.states.async_set("sensor.imp", "104.0", {"unit_of_measurement": "kWh"})
+    bridge = _bridge(hass, [GRID])
+    bridge._runtime[0].today_from.rebase(4.0, 104.0, 104.0)
+
+    def during_period(_hass, _start, _end, _sid, _types, _units) -> dict[str, float]:  # noqa: ANN001
+        return {"change": 9.0}
+
+    with (
+        patch(f"{BRIDGE_MODULE}.get_instance", return_value=_Recorder()),
+        patch(f"{BRIDGE_MODULE}.statistic_during_period", side_effect=during_period),
+        patch(f"{BRIDGE_MODULE}.statistics_during_period", return_value={}),
+    ):
+        await bridge.async_rebuild_today()
+    assert bridge._runtime[0].today_from.update(105.0) == pytest.approx(5.0)
+    assert bridge._today_retry is not None
+    await bridge.async_stop()
+
+
+async def test_today_rebuild_failure_keeps_running_value(hass: HomeAssistant) -> None:
+    hass.config.components.add("recorder")
+    bridge = _bridge(hass, [GRID])
+    with (
+        patch(f"{BRIDGE_MODULE}.get_instance", return_value=_Recorder()),
+        patch(f"{BRIDGE_MODULE}.statistics_during_period", side_effect=RuntimeError("db")),
+    ):
+        await bridge.async_rebuild_today()
+    assert not bridge.accessory.update_node.called

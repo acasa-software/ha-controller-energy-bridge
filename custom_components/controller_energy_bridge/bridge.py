@@ -15,6 +15,7 @@ from homeassistant.components.recorder import DOMAIN as RECORDER_DOMAIN
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.statistics import (
     get_metadata,
+    statistic_during_period,
     statistics_during_period,
 )
 from homeassistant.const import (
@@ -22,6 +23,7 @@ from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
+    UnitOfEnergy,
 )
 from homeassistant.core import (
     CALLBACK_TYPE,
@@ -53,6 +55,8 @@ from .const import (
     POWER_HISTORY_BUCKET_COUNT,
     POWER_HISTORY_BUCKET_SECONDS,
     POWER_HISTORY_REBUILD_SECONDS,
+    TODAY_MIDNIGHT_MINUTE,
+    TODAY_RETRY_SECONDS,
 )
 from .energy_import import NodeConfig
 from .history import (
@@ -61,7 +65,9 @@ from .history import (
     nan_count,
     pack_history,
     power_series_from_statistics,
+    row_start_of,
 )
+from .today import TodayMeter
 from .units import energy_to_kwh, parse_numeric, power_to_watts, soc_to_percent
 
 _LOGGER = logging.getLogger(__name__)
@@ -89,6 +95,8 @@ class _NodeRuntime:
     pending: dict[str, Any] = field(default_factory=dict)
     last_flush: float = 0.0
     timer: CALLBACK_TYPE | None = None
+    today_from: TodayMeter = field(default_factory=TodayMeter)
+    today_to: TodayMeter = field(default_factory=TodayMeter)
 
 
 @dataclass(slots=True)
@@ -166,6 +174,7 @@ class EnergyBridge:
         self._started = False
         self.energy_history: dict[int, HistoryStatus] = {}
         self.power_history: dict[int, HistoryStatus] = {}
+        self._today_retry: CALLBACK_TYPE | None = None
 
     # --- lifecycle ----------------------------------------------------------
 
@@ -222,6 +231,9 @@ class EnergyBridge:
             if runtime.timer is not None:
                 runtime.timer()
                 runtime.timer = None
+        if self._today_retry is not None:
+            self._today_retry()
+            self._today_retry = None
         if self.driver is not None and self._started:
             self._started = False
             try:
@@ -293,12 +305,18 @@ class EnergyBridge:
             reading = read_state(state)
             if reading.value is not None:
                 pending["energy_from"] = energy_to_kwh(reading.value, _unit(state))
+                today = runtime.today_from.update(pending["energy_from"])
+                if today is not None:
+                    pending["energy_from_today"] = today
 
         if config.energy_to_entity:
             state = states.get(config.energy_to_entity)
             reading = read_state(state)
             if reading.value is not None:
                 pending["energy_to"] = energy_to_kwh(reading.value, _unit(state))
+                today = runtime.today_to.update(pending["energy_to"])
+                if today is not None:
+                    pending["energy_to_today"] = today
 
         if config.soc_entity:
             state = states.get(config.soc_entity)
@@ -338,6 +356,8 @@ class EnergyBridge:
             energy_to=pending.get("energy_to"),
             soc=pending.get("soc"),
             fault=pending.get("fault"),
+            energy_from_today=pending.get("energy_from_today"),
+            energy_to_today=pending.get("energy_to_today"),
         )
 
     # --- history (§13) ------------------------------------------------------
@@ -354,6 +374,16 @@ class EnergyBridge:
             return
         await self.async_rebuild_energy_history()
         await self.async_rebuild_power_history()
+        await self.async_rebuild_today()
+        self._unsubscribers.append(
+            async_track_time_change(
+                self.hass,
+                self._scheduled_today_rebuild,
+                hour=0,
+                minute=TODAY_MIDNIGHT_MINUTE,
+                second=0,
+            )
+        )
         self._unsubscribers.append(
             async_track_time_change(
                 self.hass,
@@ -372,6 +402,10 @@ class EnergyBridge:
 
     async def _scheduled_energy_rebuild(self, _now: datetime) -> None:
         await self.async_rebuild_energy_history()
+        await self.async_rebuild_today()
+
+    async def _scheduled_today_rebuild(self, _now: datetime) -> None:
+        await self.async_rebuild_today()
 
     async def _scheduled_power_rebuild(self, _now: datetime) -> None:
         await self.async_rebuild_power_history()
@@ -482,3 +516,101 @@ class EnergyBridge:
             self.power_history[node.index] = HistoryStatus(
                 POWER_HISTORY_BUCKET_COUNT, nan_count(series), len(blob), now
             )
+
+    # --- today (§14) --------------------------------------------------------
+
+    def _live_energy(self, entity_id: str | None) -> float | None:
+        if not entity_id:
+            return None
+        state = self.hass.states.get(entity_id)
+        reading = read_state(state)
+        return None if reading.value is None else energy_to_kwh(reading.value, _unit(state))
+
+    async def _async_today_statistics(self, statistic_id: str) -> tuple[float, float | None] | None:
+        """Advance since local midnight and the meter reading at the same instant, in kWh.
+
+        Both come from one aligned endpoint: the end of the last compiled 5-minute period.
+        Two independent "latest" reads could straddle a compile and lose a period. None
+        when the last period ended before midnight: that reading is not today's start.
+        """
+        instance = get_instance(self.hass)
+        units = {"energy": UnitOfEnergy.KILO_WATT_HOUR}
+        # The recorder splits hourly and 5-minute data on UTC boundaries.
+        midnight = dt_util.as_utc(dt_util.start_of_local_day())
+        recent = await instance.async_add_executor_job(
+            statistics_during_period,
+            self.hass,
+            dt_util.utcnow() - timedelta(minutes=30),
+            None,
+            {statistic_id},
+            "5minute",
+            units,
+            {"state"},
+        )
+        rows = recent.get(statistic_id) or []
+        last = rows[-1] if rows else None
+        started = row_start_of(last) if last else None
+        if last is None or started is None or last.get("state") is None:
+            change = await instance.async_add_executor_job(
+                statistic_during_period, self.hass, midnight, None, statistic_id, {"change"}, units
+            )
+            return float(change.get("change") or 0.0), None
+        end = dt_util.utc_from_timestamp(started + 300)
+        if end == midnight:
+            # The period ended at midnight: its reading is where today starts.
+            return 0.0, float(last["state"])
+        if end < midnight:
+            return None
+        change = await instance.async_add_executor_job(
+            statistic_during_period, self.hass, midnight, end, statistic_id, {"change"}, units
+        )
+        return float(change.get("change") or 0.0), float(last["state"])
+
+    async def async_rebuild_today(self) -> None:
+        """Re-pin today's energy (§14) to the recorder for every node with energy statistics."""
+        if self.accessory is None or not self.history_available:
+            return
+        retry = False
+        for node in self.nodes:
+            runtime = self._runtime[node.index]
+            meters = (
+                (
+                    node.history_energy_from,
+                    node.energy_from_entity,
+                    runtime.today_from,
+                    "energy_from_today",
+                ),
+                (
+                    node.history_energy_to,
+                    node.energy_to_entity,
+                    runtime.today_to,
+                    "energy_to_today",
+                ),
+            )
+            for statistic_id, entity_id, meter, key in meters:
+                if not statistic_id:
+                    continue
+                try:
+                    statistics = await self._async_today_statistics(statistic_id)
+                except Exception:  # noqa: BLE001 - a failed read keeps the running value
+                    _LOGGER.exception("Reading today's energy for %s failed", statistic_id)
+                    continue
+                if statistics is None or (statistics[1] is None and entity_id):
+                    # Today's first period is not compiled yet, or a live sensor has no recent
+                    # period (unavailable a while): keep the running value, try again soon.
+                    retry = True
+                    continue
+                change, reference = statistics
+                value = meter.rebase(change, reference, self._live_energy(entity_id))
+                # A throttled flush still holds a value from the old baseline; it must not win.
+                if key in runtime.pending:
+                    runtime.pending[key] = value
+                self.accessory.update_node(node.index, **{key: value})
+        if retry and self._today_retry is None:
+
+            @callback
+            def _retry(_now: Any) -> None:
+                self._today_retry = None
+                self.hass.async_create_task(self.async_rebuild_today())
+
+            self._today_retry = async_call_later(self.hass, TODAY_RETRY_SECONDS, _retry)

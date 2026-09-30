@@ -62,7 +62,7 @@ def unpack_history(blob: bytes) -> dict[str, Any]:
     }
 
 
-def _row_start(row: Mapping[str, Any]) -> float | None:
+def row_start_of(row: Mapping[str, Any]) -> float | None:
     start = row.get("start")
     if start is None:
         return None
@@ -88,7 +88,7 @@ def energy_series_from_statistics(
     series: Series = [None] * count
     for row in rows:
         change = row.get("change")
-        row_start = _row_start(row)
+        row_start = row_start_of(row)
         if change is None or row_start is None:
             continue
         index = _bucket_index(row_start, start, width, count)
@@ -114,7 +114,7 @@ def power_series_from_statistics(
     weights = [0] * count
     for row in rows:
         mean = row.get("mean")
-        row_start = _row_start(row)
+        row_start = row_start_of(row)
         if mean is None or row_start is None:
             continue
         index = _bucket_index(row_start, start, width, count)

@@ -116,6 +116,8 @@ CHAR_CAPACITY = _controller_uuid(0x0117)
 CHAR_SOURCE_ENTITY = _controller_uuid(0x0118)
 CHAR_ENERGY_HISTORY = _controller_uuid(0x0119)
 CHAR_POWER_HISTORY = _controller_uuid(0x011A)
+CHAR_ENERGY_FROM_TODAY = _controller_uuid(0x011B)
+CHAR_ENERGY_TO_TODAY = _controller_uuid(0x011C)
 
 # Apple characteristics reused (§5.2)
 CHAR_NAME = _apple_uuid(0x0023)
@@ -161,3 +163,9 @@ POWER_HISTORY_MAX_BYTES = HISTORY_HEADER_SIZE + POWER_HISTORY_BUCKET_COUNT * 4
 # Rebuild schedule: energy at :15 after HA compiled the hour, power every bucket width.
 ENERGY_HISTORY_REBUILD_MINUTE = 15
 POWER_HISTORY_REBUILD_SECONDS = POWER_HISTORY_BUCKET_SECONDS
+
+# Today's energy (§14): re-read from statistics with the energy rebuild and after local midnight.
+# At 00:01 the recorder has compiled the 23:55 to 00:00 period, whose end reading is midnight's.
+TODAY_MIDNIGHT_MINUTE = 1
+# Retry when the recorder has not compiled today's first period yet.
+TODAY_RETRY_SECONDS = 300

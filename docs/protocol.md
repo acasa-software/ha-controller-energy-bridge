@@ -92,6 +92,8 @@ One per energy node. At most 64 per accessory.
 | Source Entity | `00000118-…` | string (≤128) | pr | | Home Assistant entity id feeding **Power**; diagnostic only |
 | Energy History | `00000119-…` | data | pr | | 30 days of hourly energy, §13 |
 | Power History | `0000011A-…` | data | pr | | 24 hours of 15-minute mean power, §13 |
+| Energy From Today | `0000011B-…` | float | pr, ev | kWh | Energy From direction since local midnight, §14. Range and step as Energy From |
+| Energy To Today | `0000011C-…` | float | pr, ev | kWh | Energy To direction since local midnight, §14 |
 
 The set of characteristics present depends on the role (§6). Characteristics that are not present are simply omitted from the service; the bridge never publishes placeholder values such as `0` for data it does not have.
 
@@ -223,3 +225,16 @@ A value is `NaN` when the bucket has no data (sensor unavailable, statistics not
 ### 13.5 Reading
 
 `data` values travel base64-encoded in HAP; iOS delivers them as `NSData`. The app reads with a plain characteristic read; a stale cached value is acceptable within one bucket width. Reads go through the home hub when remote, so a full set for a six-node home is under 25 KB.
+
+## 14. Today (additive, schema version 1)
+
+The energy delivered since local midnight, per direction, so the app can show daily totals without integrating power or keeping its own midnight readings. Home Assistant's statistics know the meter's advance since midnight; the live state only knows the running total, so neither alone gives a live daily value.
+
+- **Energy From Today** is present wherever the node has an Energy From statistic (entity or external statistic, §13.4), **Energy To Today** wherever it has an Energy To statistic (grid, battery). Values in kWh, `pr, ev`, threshold and step as Energy From (§9).
+- The bridge pins the value to the recorder at start, at every Energy History rebuild (:15) and at 00:01 local time: it takes the last compiled 5-minute period, its end `T` and the meter reading at `T`, and `baseline = reading at T − change from midnight to T` (Home Assistant's `statistic_during_period`, the figure its Energy dashboard shows). Both parts share the endpoint `T`, so a compile between two reads cannot drop a period. At 00:01 the last period is 23:55 to 00:00, so its reading is midnight's; a last period that ended before midnight (recorder late, sensor missing) is never taken as the start of the day: the bridge keeps the value and retries after 5 minutes. Between rebuilds `today = live meter − baseline`: as current as the live meter, no query per update.
+- A live sensor that is unavailable during a rebuild keeps the baseline; its next reading continues from there.
+- A meter reset (§9) adds the new count to what today already had; the value never drops within a day except at midnight, when it restarts from `0`.
+- A node whose statistic has no live state (external statistic) publishes the statistics value, refreshed with the Energy History rebuild.
+- Home consumption today is not published separately unless a Home node exists; the app derives it as `grid import − grid export + solar + battery discharge − battery charge`, clamped at `0`.
+- The midnight used is Home Assistant's configured time zone.
+
