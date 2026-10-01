@@ -24,6 +24,9 @@ plain version number of the release the beta leads up to.
   post-start advertisement update. That update could re-register the mDNS name after a
   reload had removed it, leaving every later start failing with
   `ServiceNameAlreadyRegistered` until Home Assistant restarted.
+- `HAP-python` and `base36` are required as minimum versions instead of exact pins, so the
+  integration follows Home Assistant when it updates them (hassfest rejects exact pins on
+  packages Home Assistant depends on).
 
 ## [1.0.0] - 2026-09-19
 
