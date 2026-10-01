@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator
 from datetime import timedelta
 from typing import Any
@@ -235,8 +236,11 @@ async def test_state_change_updates_accessory(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     grid = entry.runtime_data.accessory.nodes[0]
+    # Past the flush throttle relative to the real clock: a fixed value would fall behind the
+    # last flush on a host whose monotonic clock (uptime) is already larger.
     with patch(
-        "custom_components.controller_energy_bridge.bridge.time.monotonic", return_value=99999.0
+        "custom_components.controller_energy_bridge.bridge.time.monotonic",
+        return_value=time.monotonic() + 99999.0,
     ):
         hass.states.async_set("sensor.grid_power", "unavailable")
         await hass.async_block_till_done()
